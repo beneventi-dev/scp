@@ -1,14 +1,627 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="es">
 <head>
-    <title>SCP</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SCP · Cogeneración</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+    </script>
+    <style>
+        /* === RESET === */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0f1319;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            color: #e5e9f0;
+            height: 100vh;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        .dashboard {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            gap: 16px;
+        }
+
+        /* === HEADER === */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 1px solid #2a3344;
+            padding-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        .logo h1 {
+            font-size: 20px;
+            font-weight: 500;
+            letter-spacing: 2px;
+            color: #d0d9e8;
+        }
+
+        .logo .sub {
+            font-size: 11px;
+            color: #5d6f88;
+            letter-spacing: 2px;
+            font-weight: 300;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: #5d6f88;
+        }
+
+        .dot-online {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #4caf50;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        /* === GRID DE GRÁFICOS === */
+        .grid-charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            flex: 1;
+            gap: 14px;
+            min-height: 0;
+        }
+
+        .chart-card {
+            background: #141a24;
+            border: 1px solid #252f3f;
+            border-radius: 12px;
+            padding: 14px 16px 8px;
+            display: flex;
+            flex-direction: column;
+            transition: border-color 0.3s ease;
+            position: relative;
+        }
+
+        .chart-card.alarm {
+            border-color: #f85149 !important;
+            box-shadow: 0 0 20px rgba(248, 81, 73, 0.15);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            flex-shrink: 0;
+        }
+
+        .chart-header .name {
+            font-size: 12px;
+            font-weight: 500;
+            color: #8b9bb5;
+            letter-spacing: 0.5px;
+        }
+
+        .chart-header .value {
+            font-size: 16px;
+            font-weight: 500;
+            color: #e5e9f0;
+            transition: color 0.3s ease;
+        }
+
+        .chart-header .value.alarm {
+            color: #f85149 !important;
+        }
+
+        .chart-header .unit {
+            font-size: 11px;
+            color: #5d6f88;
+            margin-left: 2px;
+            font-weight: 300;
+        }
+
+        .chart-container {
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+        }
+
+        /* === PANEL DE CONTROL === */
+        .control-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            background: #141a24;
+            border: 1px solid #252f3f;
+            border-radius: 12px;
+            padding: 14px 24px;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .control-item label {
+            font-size: 12px;
+            color: #8b9bb5;
+            letter-spacing: 0.5px;
+        }
+
+        .control-item input[type="range"] {
+            -webkit-appearance: none;
+            width: 180px;
+            height: 4px;
+            border-radius: 2px;
+            background: #252f3f;
+            outline: none;
+            transition: background 0.2s;
+        }
+
+        .control-item input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #4c8bf5;
+            cursor: pointer;
+            border: 2px solid #0f1319;
+        }
+
+        .control-item .value-display {
+            font-size: 15px;
+            font-weight: 500;
+            color: #e5e9f0;
+            min-width: 70px;
+            text-align: right;
+        }
+
+        .control-item .value-display small {
+            font-size: 11px;
+            color: #5d6f88;
+        }
+
+        .badge-footer {
+            font-size: 11px;
+            color: #3e5068;
+            letter-spacing: 1px;
+        }
+        .badge-footer strong {
+            color: #6d7e99;
+            font-weight: 400;
+        }
+
+        .fps-counter {
+            font-size: 11px;
+            color: #3e5068;
+        }
+        .fps-counter span {
+            color: #6d7e99;
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 850px) {
+            .grid-charts {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(4, 1fr);
+            }
+            body {
+                padding: 10px;
+                overflow-y: auto;
+                height: auto;
+            }
+            .dashboard {
+                height: auto;
+            }
+            .control-panel {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .control-item {
+                justify-content: space-between;
+            }
+            .control-item input[type="range"] {
+                width: 100%;
+                max-width: 200px;
+            }
+        }
+    </style>
 </head>
-
 <body>
-    <h1>SCP</h1>
-    <p>Sistema control proceso</p>
-    <p></p>
-</body>
 
+    <div class="dashboard">
+
+        <!-- HEADER -->
+        <div class="header">
+            <div class="logo">
+                <h1>SCP</h1>
+                <span class="sub">SISTEMA DE CONTROL DE PROCESOS · COGENERACIÓN</span>
+            </div>
+            <div class="status">
+                <span class="dot-online"></span>
+                <span>En línea · <span id="liveTime">--:--:--</span></span>
+                <span class="fps-counter">⚡ <span id="fpsDisplay">0</span> fps</span>
+            </div>
+        </div>
+
+        <!-- GRID DE 4 GRÁFICOS -->
+        <div class="grid-charts">
+            <!-- 1. Combustible -->
+            <div class="chart-card" id="cardGas">
+                <div class="chart-header">
+                    <span class="name">🔥 Combustible</span>
+                    <span><span class="value" id="gasVal">0</span><span class="unit"> m³/h</span></span>
+                </div>
+                <div class="chart-container"><canvas id="chartGas"></canvas></div>
+            </div>
+
+            <!-- 2. Presión de Vapor -->
+            <div class="chart-card" id="cardPresion">
+                <div class="chart-header">
+                    <span class="name">💨 Presión Vapor</span>
+                    <span><span class="value" id="presionVal">0</span><span class="unit"> Bar</span></span>
+                </div>
+                <div class="chart-container"><canvas id="chartPresion"></canvas></div>
+            </div>
+
+            <!-- 3. RPM Turbina -->
+            <div class="chart-card" id="cardRPM">
+                <div class="chart-header">
+                    <span class="name">⚡ RPM Turbina</span>
+                    <span><span class="value" id="rpmVal">0</span><span class="unit"> RPM</span></span>
+                </div>
+                <div class="chart-container"><canvas id="chartRPM"></canvas></div>
+            </div>
+
+            <!-- 4. Nivel de Agua -->
+            <div class="chart-card" id="cardAgua">
+                <div class="chart-header">
+                    <span class="name">💧 Nivel Condensado</span>
+                    <span><span class="value" id="aguaVal">0</span><span class="unit"> %</span></span>
+                </div>
+                <div class="chart-container"><canvas id="chartAgua"></canvas></div>
+            </div>
+        </div>
+
+        <!-- PANEL DE CONTROL -->
+        <div class="control-panel">
+            <div class="control-item">
+                <label>Ajusta la demanda de energía para ver el comportamiento (Setpoint RPM)</label>
+                <input type="range" id="demandaSlider" min="2500" max="3500" value="3000" step="10" />
+                <span class="value-display" id="demandaDisplay">3000 <small>RPM</small></span>
+            </div>
+            <div class="badge-footer">
+                <strong>Beneventi-Dev</strong> · v3.0 · <span id="smoothIndicator">● suave</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ================================================================
+        //  CONFIGURACIÓN
+        // ================================================================
+        const MAX_POINTS = 40;
+
+        // Límites para cada variable
+        const LIMITS = {
+            gas: { min: 20, max: 80, label: 'm³/h' },
+            presion: { min: 38, max: 48, label: 'Bar' },
+            rpm: { min: 2700, max: 3300, label: 'RPM' },
+            agua: { min: 35, max: 65, label: '%' },
+        };
+
+        const MIN_GAS = 10,
+            MAX_GAS = 90;
+        const MIN_PRESION = 30,
+            MAX_PRESION = 55;
+        const MIN_RPM = 2500,
+            MAX_RPM = 3500;
+        const MIN_AGUA = 20,
+            MAX_AGUA = 80;
+
+        let state = { gas: 45, presion: 42, rpm: 3000, agua: 50 };
+        let target = { gas: 45, presion: 42, rpm: 3000, agua: 50 };
+        let history = { gas: [], presion: [], rpm: [], agua: [] };
+        let labels = [];
+        let charts = {};
+        let demandaRPM = 3000;
+        let frameCount = 0;
+        let lastFpsUpdate = Date.now();
+
+        // Referencias a elementos UI
+        const ui = {
+            gasVal: document.getElementById('gasVal'),
+            presionVal: document.getElementById('presionVal'),
+            rpmVal: document.getElementById('rpmVal'),
+            aguaVal: document.getElementById('aguaVal'),
+            cardGas: document.getElementById('cardGas'),
+            cardPresion: document.getElementById('cardPresion'),
+            cardRPM: document.getElementById('cardRPM'),
+            cardAgua: document.getElementById('cardAgua'),
+        };
+
+        // ================================================================
+        //  INICIALIZAR
+        // ================================================================
+        function initHistory() {
+            for (let i = 0; i < MAX_POINTS; i++) {
+                labels.push((i * 2) + 's');
+                history.gas.push(state.gas);
+                history.presion.push(state.presion);
+                history.rpm.push(state.rpm);
+                history.agua.push(state.agua);
+            }
+        }
+
+        // ================================================================
+        //  CREAR GRÁFICOS CON LÍMITES
+        // ================================================================
+        function createChart(id, color, min, max, limitMin, limitMax) {
+            const ctx = document.getElementById(id).getContext('2d');
+
+            // Array de valores para las líneas de límite
+            const limitMinArr = Array(MAX_POINTS).fill(limitMin);
+            const limitMaxArr = Array(MAX_POINTS).fill(limitMax);
+
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Valor',
+                        data: [],
+                        borderColor: color,
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.3,
+                    }, {
+                        label: 'Límite Mínimo',
+                        data: limitMinArr,
+                        borderColor: 'rgba(248, 81, 73, 0.6)',
+                        borderWidth: 1.5,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false,
+                    }, {
+                        label: 'Límite Máximo',
+                        data: limitMaxArr,
+                        borderColor: 'rgba(248, 81, 73, 0.6)',
+                        borderWidth: 1.5,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                color: '#5d6f88',
+                                font: { size: 8 },
+                                boxWidth: 10,
+                                padding: 4,
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { display: false, grid: { display: false } },
+                        y: {
+                            min: min,
+                            max: max,
+                            grid: { color: 'rgba(255,255,255,0.04)' },
+                            ticks: { color: '#5d6f88', font: { size: 8 }, stepSize: (max - min) / 4 }
+                        }
+                    },
+                    animation: { duration: 0 }
+                }
+            });
+        }
+
+        // ================================================================
+        //  LÓGICA DE SIMULACIÓN
+        // ================================================================
+        function updateTargets() {
+            demandaRPM = parseFloat(document.getElementById('demandaSlider').value);
+            target.rpm = demandaRPM;
+
+            const consumoVapor = (demandaRPM - 2500) / 1000;
+            const demandaGas = 30 + consumoVapor * 50;
+            target.gas = demandaGas;
+
+            let presionTarget = 35 + (target.gas - 30) * 0.5 - consumoVapor * 15;
+            presionTarget = Math.max(30, Math.min(55, presionTarget));
+            target.presion = presionTarget;
+
+            const evaporacion = target.gas / 100 * 0.3;
+            target.agua = 50 - evaporacion * 10;
+            target.agua = Math.max(20, Math.min(80, target.agua));
+        }
+
+        function smoothState() {
+            const SMOOTH_FACTOR = 0.09;
+            state.gas += (target.gas - state.gas) * SMOOTH_FACTOR + (Math.random() - 0.5) * 0.4;
+            state.presion += (target.presion - state.presion) * SMOOTH_FACTOR + (Math.random() - 0.5) * 0.15;
+            state.rpm += (target.rpm - state.rpm) * SMOOTH_FACTOR + (Math.random() - 0.5) * 2;
+            state.agua += (target.agua - state.agua) * SMOOTH_FACTOR + (Math.random() - 0.5) * 0.3;
+
+            state.gas = Math.max(MIN_GAS, Math.min(MAX_GAS, state.gas));
+            state.presion = Math.max(MIN_PRESION, Math.min(MAX_PRESION, state.presion));
+            state.rpm = Math.max(MIN_RPM, Math.min(MAX_RPM, state.rpm));
+            state.agua = Math.max(MIN_AGUA, Math.min(MAX_AGUA, state.agua));
+        }
+
+        // ================================================================
+        //  ALERTAS
+        // ================================================================
+        function checkAlerts() {
+            const checks = [
+                { id: 'gasVal', card: 'cardGas', value: state.gas, min: LIMITS.gas.min, max: LIMITS.gas.max },
+                { id: 'presionVal', card: 'cardPresion', value: state.presion, min: LIMITS.presion.min, max: LIMITS
+                        .presion.max },
+                { id: 'rpmVal', card: 'cardRPM', value: state.rpm, min: LIMITS.rpm.min, max: LIMITS.rpm.max },
+                { id: 'aguaVal', card: 'cardAgua', value: state.agua, min: LIMITS.agua.min, max: LIMITS.agua.max },
+            ];
+
+            checks.forEach(({ id, card, value, min, max }) => {
+                const el = document.getElementById(id);
+                const cardEl = document.getElementById(card);
+                const inAlarm = value < min || value > max;
+
+                el.classList.toggle('alarm', inAlarm);
+                cardEl.classList.toggle('alarm', inAlarm);
+            });
+        }
+
+        // ================================================================
+        //  ACTUALIZAR UI Y GRÁFICOS
+        // ================================================================
+        function updateUI() {
+            ui.gasVal.textContent = Math.round(state.gas);
+            ui.presionVal.textContent = Math.round(state.presion * 10) / 10;
+            ui.rpmVal.textContent = Math.round(state.rpm);
+            ui.aguaVal.textContent = Math.round(state.agua);
+            document.getElementById('demandaDisplay').innerHTML = Math.round(demandaRPM) + ' <small>RPM</small>';
+
+            checkAlerts();
+        }
+
+        function updateHistoryAndCharts() {
+            const secs = (labels.length * 2) % 3600;
+            const label = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+            labels.push(label);
+            if (labels.length > MAX_POINTS) labels.shift();
+
+            history.gas.push(state.gas);
+            history.presion.push(state.presion);
+            history.rpm.push(state.rpm);
+            history.agua.push(state.agua);
+
+            if (history.gas.length > MAX_POINTS) {
+                history.gas.shift();
+                history.presion.shift();
+                history.rpm.shift();
+                history.agua.shift();
+            }
+
+            // Actualizar datos
+            const datasets = [
+                charts.gas, charts.presion, charts.rpm, charts.agua
+            ];
+            const histories = [history.gas, history.presion, history.rpm, history.agua];
+            const limits = [
+                { min: LIMITS.gas.min, max: LIMITS.gas.max },
+                { min: LIMITS.presion.min, max: LIMITS.presion.max },
+                { min: LIMITS.rpm.min, max: LIMITS.rpm.max },
+                { min: LIMITS.agua.min, max: LIMITS.agua.max },
+            ];
+
+            datasets.forEach((chart, idx) => {
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = histories[idx];
+                chart.data.datasets[1].data = Array(labels.length).fill(limits[idx].min);
+                chart.data.datasets[2].data = Array(labels.length).fill(limits[idx].max);
+                chart.update('none');
+            });
+        }
+
+        // ================================================================
+        //  BUCLE PRINCIPAL (60 FPS)
+        // ================================================================
+        function loop() {
+            updateTargets();
+            smoothState();
+            updateUI();
+
+            if (frameCount % 2 === 0) {
+                updateHistoryAndCharts();
+            }
+
+            frameCount++;
+            const now = Date.now();
+            if (now - lastFpsUpdate > 1000) {
+                document.getElementById('fpsDisplay').textContent = frameCount;
+                frameCount = 0;
+                lastFpsUpdate = now;
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        // ================================================================
+        //  RELOJ
+        // ================================================================
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('liveTime').textContent = now.toLocaleTimeString();
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // ================================================================
+        //  SLIDER
+        // ================================================================
+        document.getElementById('demandaSlider').addEventListener('input', function() {
+            const val = this.value;
+            document.getElementById('demandaDisplay').innerHTML = Math.round(val) + ' <small>RPM</small>';
+        });
+
+        // ================================================================
+        //  INICIO
+        // ================================================================
+        initHistory();
+
+        charts.gas = createChart('chartGas', '#4c8bf5', 0, 100, LIMITS.gas.min, LIMITS.gas.max);
+        charts.presion = createChart('chartPresion', '#ffb347', 25, 60, LIMITS.presion.min, LIMITS.presion.max);
+        charts.rpm = createChart('chartRPM', '#4caf50', 2400, 3600, LIMITS.rpm.min, LIMITS.rpm.max);
+        charts.agua = createChart('chartAgua', '#42a5f5', 10, 90, LIMITS.agua.min, LIMITS.agua.max);
+
+        for (let i = 0; i < MAX_POINTS; i++) {
+            updateTargets();
+            smoothState();
+            updateHistoryAndCharts();
+        }
+        updateUI();
+
+        loop();
+
+        window.addEventListener('resize', () => {
+            Object.values(charts).forEach(chart => chart.resize());
+        });
+    </script>
+
+</body>
 </html>
